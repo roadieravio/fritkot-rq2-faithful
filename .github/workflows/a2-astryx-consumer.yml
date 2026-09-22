@@ -23,13 +23,19 @@ jobs:
         id: identity
         env:
           GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ github.event.workflow_run.id }}
+          HEAD_OWNER: ${{ github.event.workflow_run.head_repository.owner.login }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          TRUSTED_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          TRUSTED_HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
         run: |
-          pr=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}" --jq '.pull_requests[0].number')
+          pr=$(gh api "repos/${GITHUB_REPOSITORY}/pulls?state=open&head=${HEAD_OWNER}:${HEAD_BRANCH}" --jq '.[0].number')
+          test -n "$pr" && test "$pr" != "null"
           data=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr}")
           echo "pr=$pr" >> "$GITHUB_OUTPUT"
-          echo "head=$(jq -r .head.sha <<<"$data")" >> "$GITHUB_OUTPUT"
-          echo "head_repo=$(jq -r .head.repo.full_name <<<"$data")" >> "$GITHUB_OUTPUT"
+          test "$(jq -r .head.sha <<<"$data")" = "$TRUSTED_HEAD_SHA"
+          test "$(jq -r .head.repo.full_name <<<"$data")" = "$TRUSTED_HEAD_REPO"
+          echo "head=$TRUSTED_HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "head_repo=$TRUSTED_HEAD_REPO" >> "$GITHUB_OUTPUT"
           echo "base_repo=$(jq -r .base.repo.full_name <<<"$data")" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v8
         with:
